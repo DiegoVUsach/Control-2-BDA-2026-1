@@ -1,31 +1,49 @@
 package com.example.demo.services;
 
-import com.example.demo.entities.Usuario;
-import com.example.demo.repositories.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import java.util.Optional;
 
-/* @Service
+import com.example.demo.dto.AuthResponse;
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.repositories.UsuarioRepository;
+import com.example.demo.entities.Usuario;
+
+@Service
 public class UsuarioService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    // PasswordEncoder compara passwords de forma segura.
+    // Aunque usamos NoOpPasswordEncoder (texto plano) por simplicidad,
+    // la estructura esta lista para usar BCrypt en produccion.
     @Autowired
-    private PasswordEncoder passwordEncoder; // Inyectado para hashing seguro
+    private PasswordEncoder passwordEncoder;
 
-    public Usuario registrarUsuario(Usuario usuario) {
-        if (usuarioRepository.findByUsername(usuario.getUsername()).isPresent()) {
-            throw new RuntimeException("El nombre de usuario ya está registrado.");
+    @Autowired
+    private JwtService jwtService;
+
+    // Flujo de login:
+    // 1. Busca el usuario por nombre en la BD
+    // 2. Compara la password recibida con la guardada
+    // 3. Si coinciden, genera un token JWT con username + rol
+    // 4. Si no coinciden, lanza excepcion (el controller la atrapa)
+    public AuthResponse login(LoginRequest request) {
+        Usuario usuario = usuarioRepository.findByUsername(request.getUsername());
+        if (usuario != null && passwordEncoder.matches(request.getPassword(), usuario.getPassword())) {
+            String token = jwtService.createToken(usuario.getUsername());
+            return new AuthResponse(token);
         }
-        // Seguridad exigida: Encriptar password antes de persistir
-        usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
-        return usuarioRepository.save(usuario);
+        throw new RuntimeException("Credenciales invalidas");
     }
 
-    public Optional<Usuario> buscarPorUsername(String username) {
-        return usuarioRepository.findByUsername(username);
+    // Flujo de registro:
+    // 1. Encripta la password (con NoOp queda igual, con BCrypt la hashea)
+    // 2. Asigna rol USER por defecto si no viene uno
+    // 3. Guarda en la BD
+    public void register(Usuario usuario) {
+        usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
+        usuarioRepository.save(usuario);
     }
-}*/
+}

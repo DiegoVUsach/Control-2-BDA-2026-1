@@ -1,0 +1,30 @@
+package com.example.demo.controllers;
+
+import com.example.demo.dto.UsuarioDTO;
+import com.example.demo.repositories.UsuarioRepository;
+import com.example.demo.entities.Usuario;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+// Controller para operaciones del usuario autenticado.
+@RestController
+@RequestMapping("/api/usuarios")
+@CrossOrigin("*")
+public class UsuarioController {
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    // GET /api/usuarios/me
+    // Ruta PROTEGIDA. Devuelve los datos del usuario autenticado.
+    // "Authentication auth" es inyectado automaticamente por Spring Security
+    // a partir del token JWT. auth.getName() retorna el username del token.
+    @GetMapping("/me")
+    public UsuarioDTO miPerfil(Authentication auth) {
+        Usuario u = usuarioRepository.findByUsername(auth.getName());
+        if (u == null)
+            return null;
+        return new UsuarioDTO(u.getIdUsuario(), u.getUsername());
+    }
+}

@@ -12,7 +12,7 @@ DROP TABLE IF EXISTS USUARIOS CASCADE;
 -- =====================================================================
 -- 1. TABLA: USUARIOS
 -- =====================================================================
-CREATE TABLE USUARIOS (
+CREATE TABLE USUARIO (
     id_usuario   SERIAL PRIMARY KEY,
     username     VARCHAR(80) UNIQUE NOT NULL,
     password     VARCHAR(80) NOT NULL, -- Soportará el hash encriptado por seguridad
