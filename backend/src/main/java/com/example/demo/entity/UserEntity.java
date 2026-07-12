@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.locationtech.jts.geom.Point;
 
+// alomas implementar algo de roles
 @Entity
 @Table(name = "users")
 @Data
