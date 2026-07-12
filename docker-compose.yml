@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4   # PostgreSQL 16 CON PostGIS ya instalado
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tareas_db        # se crea sola al primer arranque
+    ports:
+      - "5435:5432"                 # puerto de tu PC : puerto interno
+    volumes:
+      - datos_db:/var/lib/postgresql/data
+
+volumes:
+  datos_db:
