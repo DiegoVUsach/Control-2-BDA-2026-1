@@ -1,15 +1,41 @@
 services:
   db:
-    image: postgis/postgis:16-3.4   # PostgreSQL 16 CON PostGIS ya instalado
+    image: postgis/postgis:16-3.4 # PostgreSQL 16 CON PostGIS ya instalado
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: tareas_db        # se crea sola al primer arranque
+      POSTGRES_DB: tareas_db # se crea sola al primer arranque
     ports:
-      - "5435:5432"                 # puerto de tu PC : puerto interno
+      - "5435:5432" # puerto de tu PC : puerto interno
     volumes:
       - datos_db:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://db:5432/tareas_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - db
+      - backend
 
 volumes:
   datos_db:
