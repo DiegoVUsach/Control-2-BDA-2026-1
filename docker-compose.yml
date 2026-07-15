@@ -1,40 +1,56 @@
+# ============================================================
+# CONTROL 2 - TALLER DE BASE DE DATOS 1-2026
+# Despliegue completo: base de datos + backend + frontend
+#   - db:       PostgreSQL 16 + PostGIS 3.4. Al crearse por primera
+#               vez ejecuta automaticamente dbCreate.sql y loadData.sql
+#               (carpeta /docker-entrypoint-initdb.d)
+#   - backend:  API Spring Boot (se compila dentro del contenedor)
+#   - frontend: aplicacion Vue compilada, servida por nginx, que ademas
+#               redirige /api al backend
+# Uso: docker compose up -d --build
+# App: http://localhost:8081  |  API: http://localhost:8080
+# ============================================================
 services:
   db:
-    image: postgis/postgis:16-3.4 # PostgreSQL 16 CON PostGIS ya instalado
+    image: postgis/postgis:16-3.4
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: tareas_db # se crea sola al primer arranque
+      POSTGRES_DB: tareas_db
     ports:
-      - "5435:5432" # puerto de tu PC : puerto interno
+      - "5435:5432"
     volumes:
+      - ./dbCreate.sql:/docker-entrypoint-initdb.d/01-dbCreate.sql:ro
+      - ./loadData.sql:/docker-entrypoint-initdb.d/02-loadData.sql:ro
       - datos_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tareas_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     restart: always
-    ports:
-      - "8080:8080"
     environment:
-      SERVER_PORT: 8080
       DB_URL: jdbc:postgresql://db:5432/tareas_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      CORS_ORIGIN: http://localhost:8081
+      JWT_SECRET: clave-secreta-control2-tbd-usach-2026-cambiar-en-produccion-9f8e7d6c5b4a
+    ports:
+      - "8080:8080"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    build: ./frontend
     restart: always
     ports:
-      - "5173:80"
+      - "8081:80"
     depends_on:
-      - db
       - backend
 
 volumes:

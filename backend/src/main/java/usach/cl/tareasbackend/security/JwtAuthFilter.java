@@ -1,5 +1,3 @@
-//el middleware; corre en CADA petición, valida el token y puebla el contexto de seguridad.
-
 package usach.cl.tareasbackend.security;
 
 import io.jsonwebtoken.Claims;

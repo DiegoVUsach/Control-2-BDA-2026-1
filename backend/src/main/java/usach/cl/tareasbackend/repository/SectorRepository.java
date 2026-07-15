@@ -1,8 +1,9 @@
 package usach.cl.tareasbackend.repository;
 
-import usach.cl.tareasbackend.dto.SectorDto;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import usach.cl.tareasbackend.dto.SectorDto;
 
 import java.util.List;
 
@@ -33,5 +34,26 @@ public class SectorRepository {
                 rs.getString("nombre"),
                 rs.getDouble("latitud"),
                 rs.getDouble("longitud")));
+    }
+
+    /** Crea un sector georreferenciado y devuelve su id. */
+    public int insertar(String nombre, double latitud, double longitud) {
+        String sql = """
+                INSERT INTO sector (nombre, ubicacion)
+                VALUES (:nombre, ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326))
+                RETURNING id_sector
+                """;
+        var params = new MapSqlParameterSource()
+                .addValue("nombre", nombre)
+                .addValue("latitud", latitud)
+                .addValue("longitud", longitud);
+        return jdbc.queryForObject(sql, params, Integer.class);
+    }
+
+    public boolean existeNombre(String nombre) {
+        String sql = "SELECT COUNT(*) FROM sector WHERE LOWER(nombre) = LOWER(:nombre)";
+        Integer n = jdbc.queryForObject(sql,
+                new MapSqlParameterSource("nombre", nombre), Integer.class);
+        return n != null && n > 0;
     }
 }

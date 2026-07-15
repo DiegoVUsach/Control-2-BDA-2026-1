@@ -1,5 +1,3 @@
-//traduce excepciones a códigos HTTP con JSON uniforme {"error": ...}.
-
 package usach.cl.tareasbackend.controller;
 
 import org.springframework.http.HttpStatus;

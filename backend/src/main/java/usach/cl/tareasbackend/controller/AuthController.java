@@ -1,5 +1,3 @@
-//mapea las dos rutas públicas.
-
 package usach.cl.tareasbackend.controller;
 
 import usach.cl.tareasbackend.dto.AuthDtos.LoginRequest;
@@ -31,7 +29,7 @@ public class AuthController {
         int id = authService.registrar(req);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("id", id, "nombreUsuario", req.nombreUsuario(),
-                        "mensaje", "Usuario registrado. Ahora puede iniciar sesion."));
+                             "mensaje", "Usuario registrado. Ahora puede iniciar sesion."));
     }
 
     @PostMapping("/login")

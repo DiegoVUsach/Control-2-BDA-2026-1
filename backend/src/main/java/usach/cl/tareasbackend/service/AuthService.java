@@ -1,16 +1,13 @@
-//nombre único, hash BCrypt al registrar,
-// matches() al validar, mismo mensaje si falla usuario o clave.
-
 package usach.cl.tareasbackend.service;
 
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 import usach.cl.tareasbackend.dto.AuthDtos.LoginRequest;
 import usach.cl.tareasbackend.dto.AuthDtos.LoginResponse;
 import usach.cl.tareasbackend.dto.AuthDtos.RegistroRequest;
 import usach.cl.tareasbackend.repository.UsuarioRepository;
 import usach.cl.tareasbackend.security.JwtUtil;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
@@ -40,7 +37,7 @@ public class AuthService {
         }
         String hash = passwordEncoder.encode(req.contrasena());
         return usuarioRepository.insertar(req.nombreUsuario(), hash,
-                req.direccion(), req.latitud(), req.longitud());
+                req.latitud(), req.longitud());
     }
 
     /** Valida credenciales y genera el JWT. */

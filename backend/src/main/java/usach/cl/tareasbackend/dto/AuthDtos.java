@@ -1,19 +1,18 @@
-//records de entrada/salida con validación declarativa.
-
 package usach.cl.tareasbackend.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * DTOs de autenticacion (registro y login).
+ * DTOs de autenticacion. La "direccion geografica" del enunciado se
+ * materializa como el punto (latitud/longitud) elegido en el mapa:
+ * no se solicita direccion textual.
  */
 public class AuthDtos {
 
     public record RegistroRequest(
             @NotBlank String nombreUsuario,
             @NotBlank String contrasena,
-            @NotBlank String direccion,
             @NotNull Double latitud,
             @NotNull Double longitud) {
     }

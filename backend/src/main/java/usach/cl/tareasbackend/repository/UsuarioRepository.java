@@ -1,6 +1,3 @@
-//SQL explícito parametrizado (prepared statements = sin inyección);
-// el punto PostGIS entra con ST_MakePoint y sale con ST_X/ST_Y.
-
 package usach.cl.tareasbackend.repository;
 
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -12,8 +9,7 @@ import java.util.Optional;
 
 /**
  * Acceso a datos de usuarios con SQL explicito (sin ORM).
- * Todas las consultas usan parametros nombrados, que se traducen a
- * prepared statements: proteccion contra inyeccion SQL.
+ * Consultas con parametros nombrados = prepared statements = sin inyeccion.
  */
 @Repository
 public class UsuarioRepository {
@@ -26,23 +22,21 @@ public class UsuarioRepository {
 
     /** Registra un usuario guardando su ubicacion como punto PostGIS. */
     public int insertar(String nombreUsuario, String hashContrasena,
-                        String direccion, double latitud, double longitud) {
+                        double latitud, double longitud) {
         String sql = """
-                INSERT INTO usuario (nombre_usuario, contrasena, direccion, ubicacion)
-                VALUES (:nombre, :contrasena, :direccion,
+                INSERT INTO usuario (nombre_usuario, contrasena, ubicacion)
+                VALUES (:nombre, :contrasena,
                         ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326))
                 RETURNING id_usuario
                 """;
         var params = new MapSqlParameterSource()
                 .addValue("nombre", nombreUsuario)
                 .addValue("contrasena", hashContrasena)
-                .addValue("direccion", direccion)
                 .addValue("latitud", latitud)
                 .addValue("longitud", longitud);
         return jdbc.queryForObject(sql, params, Integer.class);
     }
 
-    /** Busca un usuario por nombre; retorna id y hash de contrasena. */
     public Optional<Map<String, Object>> buscarPorNombre(String nombreUsuario) {
         String sql = """
                 SELECT id_usuario, nombre_usuario, contrasena
@@ -56,7 +50,7 @@ public class UsuarioRepository {
     /** Perfil del usuario con sus coordenadas extraidas del punto PostGIS. */
     public Optional<Map<String, Object>> datosPerfil(int idUsuario) {
         String sql = """
-                SELECT id_usuario, nombre_usuario, direccion,
+                SELECT id_usuario, nombre_usuario,
                        ST_Y(ubicacion) AS latitud,
                        ST_X(ubicacion) AS longitud
                 FROM usuario

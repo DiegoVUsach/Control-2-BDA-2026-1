@@ -1,5 +1,3 @@
-//JwtUtil: fabrica y valida los tokens (HS256, clave simétrica del servidor).
-
 package usach.cl.tareasbackend.security;
 
 import io.jsonwebtoken.Claims;
@@ -45,3 +43,4 @@ public class JwtUtil {
                 .parseClaimsJws(token).getBody();
     }
 }
+

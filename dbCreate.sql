@@ -12,8 +12,10 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- ============================================================
 -- TABLA: sector
--- Sectores de trabajo (construccion, semaforos, calles, etc.)
--- Cada sector esta georreferenciado con un punto (SRID 4326)
+-- Un sector es una ZONA DE OPERACIONES: un foco de obra fisico en la
+-- ciudad (ej: "Semaforo danado - Plaza de Armas"). Por eso tiene un
+-- punto georreferenciado unico (SRID 4326). Las tareas son los
+-- quehaceres concretos que se ejecutan en esa zona.
 -- ============================================================
 DROP TABLE IF EXISTS sector CASCADE;
 CREATE TABLE sector (
@@ -34,7 +36,6 @@ CREATE TABLE usuario (
     id_usuario SERIAL,
     nombre_usuario VARCHAR(100) NOT NULL UNIQUE,
     contrasena VARCHAR(255) NOT NULL,
-    direccion VARCHAR(255) NOT NULL,
     ubicacion GEOMETRY(Point, 4326) NOT NULL,
     PRIMARY KEY (id_usuario)
 );
