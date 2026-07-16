@@ -1,14 +1,10 @@
 
 # Despliegue completo: base de datos + backend + frontend
-#   - db:       PostgreSQL 16 + PostGIS 3.4. Al crearse por primera
-#               vez ejecuta automaticamente dbCreate.sql y loadData.sql
-#               (carpeta /docker-entrypoint-initdb.d)
+#   - db:       PostgreSQL 16 + PostGIS 3.4. Al crearse por primera vez ejecuta automaticamente dbCreate.sql y loadData.sql
 #   - backend:  API Spring Boot (se compila dentro del contenedor)
-#   - frontend: aplicacion Vue compilada, servida por nginx, que ademas
-#               redirige /api al backend
+#   - frontend: aplicacion Vue compilada, servida por nginx, que ademas  redirige /api al backend
 # Uso: docker compose up -d --build
 # App: http://localhost:8081  |  API: http://localhost:8080
-# ============================================================
 services:
   db:
     image: postgis/postgis:16-3.4
