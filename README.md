@@ -1,209 +1,127 @@
-# Tareas Territoriales — Control 2, Taller de Base de Datos 1-2026
+# Aplicación de Tareas Territoriales
 
-Sistema de gestión de tareas georreferenciadas. Los usuarios se registran con su
-ubicación geográfica (punto PostGIS), crean y gestionan tareas asociadas a
-sectores de trabajo también georreferenciados (construcción, semáforos, calles,
-etc.), reciben notificaciones de vencimiento y consultan estadísticas
-espaciales (distancias, radios, agrupaciones) calculadas con PostGIS.
+Integrantes: Sebastian Salles, Martin Fuentes, Diego Vega, Ignacio Caro
 
-## Arquitectura y tecnologías
 
-Arquitectura desacoplada de tres capas:
+Sistema de gestion de tareas con datos geograficos. El usuario se registra con
+su ubicacion, que se guarda como un punto PostGIS, crea tareas asociadas a zonas (sectores) de trabajo (tambien georreferenciadas), 
+recibe avisos cuando una tareaesta por vencer, y puede ver estadisticas.
+(distancias, radios y agrupaciones).
 
-```
-┌─────────────────┐   HTTP/JSON    ┌──────────────────┐    SQL     ┌──────────────────────┐
-│  FRONTEND        │ ─────────────▶ │  BACKEND          │ ─────────▶ │  BASE DE DATOS        │
-│  Vue 3 + Vite    │  JWT en header │  Spring Boot 3    │  JDBC      │  PostgreSQL 16        │
-│  Leaflet (mapas) │ ◀───────────── │  API RESTful      │ ◀───────── │  + PostGIS 3.4        │
-│  nginx (prod)    │                │  Java 17          │            │  (puntos, triggers)   │
-└─────────────────┘                └──────────────────┘            └──────────────────────┘
-```
+Parte del enunciado estaba abierto a interpretación y se decidió trabajar los sectores como
+una "tarea principal" a la cual se le asignan sub-tareas. Nos imaginamos un trabajador que le asignan
+el sector Alameda con Victor Jara, título "Reparar semáforo", luego de creado ese sector Reparar Semáforo asociado a ese punto geográfico
+ se empiezan a asignar tareas como: comprar semáforo, desmontar semáforo antiguo, conectar cables, etc.
 
-| Capa | Tecnología | Detalle |
+(En el enunciado decia que sector debe ser por ejemplo: construcción, pero "construcción" no tiene sentido asociarlo
+a solo un lugar en el mapa, ya que construcción se puede realizar en distintas zonas de la ciudad, es por esto que se 
+decidió con el diseño mencionado)
+
+## Tecnologias
+
+- Frontend: Vue 3 con Vite, Vue Router, Axios y Leaflet para los mapas
+- Backend: Spring Boot 3 (Java 17), API REST, Spring Security con JWT
+- Base de datos: PostgreSQL 16 con PostGIS 3.4
+- Acceso a datos: JdbcTemplate con SQL escrito a mano, sin ORM (norma del curso)
+- Despliegue: Docker Compose (base de datos, backend y frontend con nginx)
+
+## Estructura
+
+
+dbCreate.sql          Tablas, indices GIST, funcion y trigger
+loadData.sql          Datos de prueba: 9 usuarios, 19 zonas, 177 tareas
+runStatements.sql     Las consultas del enunciado
+docker-compose.yml    Levanta los tres servicios
+backend/              API en Spring Boot
+frontend/             Aplicacion Vue
+
+
+## Como levantarlo
+
+Solo se necesita Docker instalado (con Docker Compose). No hace falta instalar Java, Maven, Node ni PostgreSQL: todo se compila dentro de los contenedores.
+
+En consola en la carpeta del proyecto:
+docker compose up -d --build
+
+
+La primera vez demora varios minutos porque descarga las imagenes y compila el backend y el frontend. La base de datos se crea y se llena sola: el contenedor
+de PostGIS ejecuta `dbCreate.sql` y `loadData.sql` al arrancar por primera vez. El backend espera a que la base este lista antes de partir.
+
+Cuando termine:
+
+| Aplicacion | http://localhost:8081 |
+| API | http://localhost:8080 |
+| Base de datos | localhost:5435, usuario `postgres`, clave `postgres`, BD `tareas_db` |
+
+Para detener: `docker compose down`.
+Para reiniciar la base desde cero: `docker compose down -v` y volver a levantar.
+
+## Usuarios de prueba
+
+| Usuario | Clave | Ubicacion |
 |---|---|---|
-| Frontend | Vue 3 (Composition API) + Vite | Componentes reutilizables, Vue Router, Axios, Leaflet para mapas |
-| Backend | Spring Boot 3 (Java 17) | API RESTful, Spring Security + JWT, `NamedParameterJdbcTemplate` con **SQL explícito (sin ORM)** |
-| Base de datos | PostgreSQL 16 + PostGIS 3.4 | Puntos `GEOMETRY(Point, 4326)`, índices GIST, trigger de notificaciones |
-| Despliegue | Docker Compose | 3 contenedores; nginx sirve el frontend y hace proxy de `/api` al backend |
+| admin | admin123 | USACH, Estacion Central |
+| mzapata | clave123 | Providencia |
+| cfuentes | clave123 | Maipu |
+| jperez | clave123 | La Florida |
+| vrojas | clave123 | Las Condes |
+| rmorales | clave123 | Nunoa |
+| avaldes | clave123 | Puente Alto |
+| ktapia | clave123 | Quilicura |
+| pgomez | clave123 | Pedro Aguirre Cerda |
 
-## Estructura del repositorio
+Tambien se puede registrar un usuario nuevo. El registro pide marcar la ubicacion en el mapa (usa el GPS del navegador y se puede ajustar a mano.
+Si se rechaza el permiso, el mapa parte centrado en Santiago).
 
-```
-.
-├── dbCreate.sql              # Esquema: tablas, índices GIST, función y trigger
-├── loadData.sql              # Datos de prueba (usuarios, sectores, 30 tareas en Santiago)
-├── runStatements.sql         # Las 8 consultas espaciales del enunciado, comentadas
-├── docker-compose.yml        # Despliegue completo (db + backend + frontend)
-├── backend/                  # API Spring Boot (ver backend/README.md: doc de la API)
-├── frontend/                 # Aplicación Vue 3
-├── GUIA_DE_DEFENSA.md        # Explicación de cada elemento del proyecto (para estudiar)
-└── INSTRUCCIONES DE EJECUCION.txt   # Versión corta de este manual
-```
 
-## Manual de instalación y despliegue
+## Como esta armado el codigo
 
-### Requisito único
+El backend sigue el esquema controller / service / repository. El controller recibe la peticion HTTP, 
+el service tiene las reglas (por ejemplo que el nombre de usuario no se repita, o hashear la clave antes de guardarla) y el repository es el unico lugar donde hay SQL.
 
-Tener instalado **Docker** (con Docker Compose v2, incluido en Docker Desktop).
-No se necesita instalar Java, Maven, Node ni PostgreSQL: todo se compila y
-ejecuta dentro de los contenedores.
+El frontend separa vistas de componentes. Las vistas (`TareasView`, `EstadisticasView`, `MapaView`) son las que llaman a la API. 
+Los componentes (`TareaCard`, `TareaForm`, `FiltrosBarra`, `PanelNotificaciones`, `MapaSelector`, `MapaSectores`, `BarraNavegacion`) reciben datos por props 
+y avisan hacia arriba con eventos, asi que se pueden reutilizar. `TareaForm`, por ejemplo, es el mismo componente para crear y para editar.
 
-### Opción A — Despliegue completo con Docker (recomendada)
+Los filtros y la busqueda se resuelven en la base de datos, no en el navegador:
+la barra de filtros cambia los parametros de `GET /api/tareas` y el `WHERE` se arma en SQL.
 
-1. Abrir una terminal en la carpeta raíz del proyecto (donde está
-   `docker-compose.yml`).
+## Endpoints
 
-2. Levantar todo:
+| Metodo y ruta | Que hace | Auth |
+|---|---|---|
+| POST `/api/auth/register` | Registro con nombre, clave y coordenadas | Publica |
+| POST `/api/auth/login` | Devuelve el JWT | Publica |
+| GET `/api/usuarios/me` | Perfil y coordenadas del usuario | JWT |
+| GET `/api/tareas?estado=&buscar=` | Lista con filtro y busqueda | JWT |
+| POST `/api/tareas` | Crear tarea | JWT |
+| PUT `/api/tareas/{id}` | Editar tarea | JWT |
+| DELETE `/api/tareas/{id}` | Eliminar tarea | JWT |
+| PATCH `/api/tareas/{id}/completar` | Marcar como completada | JWT |
+| GET `/api/sectores` | Zonas georreferenciadas | JWT |
+| POST `/api/sectores` | Crear una zona | JWT |
+| GET `/api/notificaciones` | Avisos de tareas por vencer | JWT |
+| PATCH `/api/notificaciones/{id}/leer` | Marcar aviso como leido | JWT |
+| GET `/api/estadisticas/...` | Las preguntas del enunciado (ver abajo) | JWT |
 
-   ```bash
-   docker compose up -d --build
-   ```
 
-   La primera ejecución tarda varios minutos: descarga las imágenes, compila el
-   backend con Maven y el frontend con Node dentro de Docker. Las siguientes
-   ejecuciones son casi inmediatas.
 
-3. La base de datos se **crea y carga sola** la primera vez: el contenedor de
-   PostGIS ejecuta automáticamente `dbCreate.sql` y `loadData.sql` (montados en
-   `/docker-entrypoint-initdb.d`). El backend espera a que la base de datos
-   esté sana (healthcheck) antes de arrancar.
+## Las preguntas del enunciado
 
-4. Verificar que los tres servicios estén arriba:
+| Pregunta | Endpoint | PostGIS usado |
+|---|---|---|
+| Cuantas tareas ha hecho el usuario por sector | `/estadisticas/tareas-por-sector` | JOIN y GROUP BY |
+| Tarea pendiente mas cercana | `/estadisticas/tarea-mas-cercana` | operador `<->` y `ST_Distance` |
+| Sector con mas completadas en 2 km | `/estadisticas/sector-mas-completadas?radioKm=2` | `ST_DWithin` |
+| Sector con mas completadas en 5 km | `/estadisticas/sector-mas-completadas?radioKm=5` | `ST_DWithin` |
+| Promedio de distancia de las completadas | `/estadisticas/promedio-distancia` | `AVG(ST_Distance(...))` |
+| Donde se concentran las pendientes | `/estadisticas/clusters-pendientes?k=3` | `ST_ClusterKMeans`, `ST_Collect`, `ST_Centroid` |
+| Cuantas tareas ha realizado cada usuario por sector | `/estadisticas/tareas-por-usuario-sector` | JOIN y GROUP BY |
+| (apoyo del mapa) zonas con pendientes y su grupo | `/estadisticas/pendientes-por-zona` | `ST_ClusterKMeans` |
+| (apoyo del mapa) zonas con completadas y radios | `/estadisticas/completadas-por-zona` | `ST_DWithin` y `ST_Distance` |
 
-   ```bash
-   docker compose ps
-   ```
-
-5. Abrir la aplicación:
-
-   | Servicio | URL |
-   |---|---|
-   | Aplicación web | http://localhost:8081 |
-   | API REST | http://localhost:8080 |
-   | PostgreSQL | localhost:5435 — usuario `postgres`, contraseña `postgres`, BD `tareas_db` |
-
-6. Iniciar sesión con un usuario de prueba o registrar uno nuevo (el registro
-   pide marcar la ubicación en el mapa):
-
-   | Usuario | Contraseña |
-   |---|---|
-   | admin | admin123 |
-   | mzapata, cfuentes, jperez, vrojas | clave123 |
-
-Para **detener**: `docker compose down`. Para **reiniciar la base de datos
-desde cero** (vuelve a ejecutar los scripts): `docker compose down -v` y luego
-`docker compose up -d --build`.
-
-### Opción B — Desarrollo local (BD en Docker, backend y frontend nativos)
-
-Requiere Java 17+, Maven 3.8+ y Node 18+.
-
-```bash
-# 1. Solo la base de datos
-docker compose up -d db
-
-# 2. Backend (queda en http://localhost:8080)
-cd backend
-mvn spring-boot:run
-
-# 3. Frontend (queda en http://localhost:5173; Vite redirige /api al backend)
-cd frontend
-npm install
-npm run dev
-```
-
-### Ejecutar las 8 consultas del enunciado por consola (opcional)
+Las mismas consultas estan en `runStatements.sql`, comentadas, para correrlas directo en el motor:
 
 ```bash
 docker exec -i control-2-bda-2026-1-db-1 psql -U postgres -d tareas_db < runStatements.sql
 ```
-
-Si el nombre del contenedor difiere (depende del nombre de la carpeta),
-verificarlo con `docker ps`.
-
-### Problemas frecuentes
-
-- **"port is already allocated"**: otro proceso usa 5435, 8080 u 8081. Cambiar
-  el lado izquierdo del mapeo de puertos en `docker-compose.yml`.
-- **La BD quedó a medias** (por ejemplo se interrumpió la primera carga): los
-  scripts de `initdb.d` solo corren con el volumen vacío. Ejecutar
-  `docker compose down -v` y volver a levantar.
-- **El mapa se ve gris**: las teselas del mapa vienen de OpenStreetMap; se
-  requiere conexión a internet en el navegador.
-
-## Documentación de la API
-
-La referencia completa con ejemplos de JSON está en
-[`backend/README.md`](backend/README.md). Resumen:
-
-| Método y ruta | Descripción | Autenticación |
-|---|---|---|
-| POST `/api/auth/register` | Registro con nombre, contraseña y coordenadas (punto PostGIS) | Pública |
-| POST `/api/auth/login` | Entrega el JWT | Pública |
-| GET `/api/usuarios/me` | Perfil y coordenadas del usuario autenticado | JWT |
-| GET `/api/tareas?estado=&buscar=` | Lista con filtro por estado y búsqueda por palabra clave | JWT |
-| POST `/api/tareas` | Crear tarea (título, descripción, vencimiento, sector) | JWT |
-| PUT `/api/tareas/{id}` | Editar tarea | JWT |
-| DELETE `/api/tareas/{id}` | Eliminar tarea | JWT |
-| PATCH `/api/tareas/{id}/completar` | Marcar como completada | JWT |
-| GET `/api/sectores` | Sectores georreferenciados | JWT |
-| GET `/api/notificaciones` | Avisos de tareas por vencer (≤ 3 días) | JWT |
-| PATCH `/api/notificaciones/{id}/leer` | Marcar aviso como leído | JWT |
-| GET `/api/estadisticas/...` | Las 8 preguntas del enunciado (ver tabla siguiente) | JWT |
-
-Endpoints de estadísticas — **todas privadas** (cada una se calcula solo con
-las tareas del usuario autenticado; las preguntas "por cada usuario" del
-enunciado se responden con la misma ruta evaluada en la sesión de cada uno):
-
-| Endpoint | Pregunta |
-|---|---|
-| `/api/estadisticas/tareas-por-sector` | Tareas hechas por el usuario por sector |
-| `/api/estadisticas/tarea-mas-cercana` | Tarea pendiente más cercana (KNN + `ST_Distance`) |
-| `/api/estadisticas/sector-mas-completadas?radioKm=2` | Sector con más completadas en 2 km (`ST_DWithin`) |
-| `/api/estadisticas/sector-mas-completadas?radioKm=5` | Ídem en 5 km |
-| `/api/estadisticas/promedio-distancia` | Promedio de distancia de las completadas |
-| `/api/estadisticas/clusters-pendientes?k=3` | Concentración espacial de pendientes (`ST_ClusterKMeans`, con radio en metros para el mapa) |
-
-**Interpretación del modelo** (documentada también en la guía de defensa): un
-*sector* es una **zona de operaciones** — un foco de obra físico y
-georreferenciado en la ciudad (ej. "Semáforo dañado — Plaza de Armas") — y las
-*tareas* son los quehaceres concretos que la cuadrilla ejecuta en esa zona.
-Esto resuelve la aparente paradoja del enunciado (una categoría abstracta como
-"construcción" no vive en una coordenada) y hace física la pregunta de la
-tarea más cercana.
-
-Ejemplo de uso con `curl`:
-
-```bash
-# 1. Login
-TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"nombreUsuario":"admin","contrasena":"admin123"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
-
-# 2. Tarea pendiente más cercana (P2)
-curl -s http://localhost:8080/api/estadisticas/tarea-mas-cercana \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-## Cumplimiento de requisitos del enunciado
-
-| Requisito | Dónde está implementado |
-|---|---|
-| Registro con punto geoespacial (PostGIS) | `RegistroView.vue` (GPS con ajuste en mapa; si se rechaza, mapa centrado en Santiago) → `POST /api/auth/register` → `UsuarioRepository.insertar` con `ST_SetSRID(ST_MakePoint(lng, lat), 4326)` |
-| Crear / editar / eliminar / completar / listar tareas | `TareasView.vue` + `TareaController` + `TareaRepository` |
-| Filtros por estado y búsqueda por palabra clave | `FiltrosBarra.vue` → query params → SQL con `ILIKE` parametrizado |
-| Notificaciones de vencimiento | Trigger `trg_notificar_vencimiento` (dbCreate.sql) + `GET /api/notificaciones` + campana en la interfaz |
-| Sectores georreferenciados | Tabla `sector` con `GEOMETRY(Point, 4326)`; asociación por FK en `tarea`; creación desde la app con el mismo flujo GPS/mapa (`POST /api/sectores`) |
-| Las 8 preguntas con funciones PostGIS | `runStatements.sql` y `EstadisticaRepository` (`ST_Distance`, `ST_DWithin`, operador KNN `<->`, `ST_ClusterKMeans`, `ST_Centroid`, `ST_ClosestPoint`) |
-| Frontend Vue con componentes reutilizables | `frontend/src/components/` (TareaCard, TareaForm, FiltrosBarra, PanelNotificaciones, MapaSelector, MapaSectores, BarraNavegacion) |
-| Backend API RESTful en Spring | `backend/` (Spring Boot 3; acceso a datos con SQL explícito, sin ORM, según la norma del curso) |
-| Autenticación y autorización | JWT (middleware `JwtAuthFilter`) + autorización a nivel de datos: cada consulta filtra por el `id_usuario` del token |
-| Protección contra inyección SQL | Todas las consultas usan parámetros nombrados (prepared statements); nunca se concatena entrada del usuario |
-| Protección CSRF | API stateless con token en header `Authorization` (no en cookie): el vector CSRF no aplica; deshabilitado con justificación documentada en `SecurityConfig` |
-| Despliegue en entorno de producción | Docker Compose: build multi-etapa, frontend optimizado servido por nginx con proxy inverso, healthcheck de BD |
-| Documentación | Este README + `backend/README.md` (API) + `GUIA_DE_DEFENSA.md` (explicación de cada elemento) |
-
-## Créditos
-
-Proyecto para el curso Taller de Base de Datos Diurno 1-2026,
-Departamento de Ingeniería Informática, Universidad de Santiago de Chile.

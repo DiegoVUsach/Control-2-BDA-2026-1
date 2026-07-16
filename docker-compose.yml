@@ -1,5 +1,4 @@
-# ============================================================
-# CONTROL 2 - TALLER DE BASE DE DATOS 1-2026
+
 # Despliegue completo: base de datos + backend + frontend
 #   - db:       PostgreSQL 16 + PostGIS 3.4. Al crearse por primera
 #               vez ejecuta automaticamente dbCreate.sql y loadData.sql

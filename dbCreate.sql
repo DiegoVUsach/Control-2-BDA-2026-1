@@ -1,5 +1,4 @@
--- ============================================================
--- CONTROL 2 - TALLER DE BASE DE DATOS 1-2026
+
 -- Sistema de Gestion de Tareas con datos geoespaciales
 -- Script de creacion de estructura (dbCreate.sql)
 -- ============================================================
@@ -103,16 +102,25 @@ CREATE INDEX idx_tarea_completada  ON tarea (completada);
 -- ============================================================
 CREATE OR REPLACE FUNCTION fn_notificar_vencimiento()
 RETURNS TRIGGER AS $$
+DECLARE
+    v_mensaje VARCHAR(255);
 BEGIN
     IF NOT NEW.completada
        AND NEW.fecha_vencimiento <= CURRENT_DATE + INTERVAL '3 days' THEN
-        INSERT INTO notificacion (mensaje, id_usuario, id_tarea)
-        VALUES (
-            'La tarea "' || NEW.titulo || '" vence el ' ||
-            TO_CHAR(NEW.fecha_vencimiento, 'DD-MM-YYYY'),
-            NEW.id_usuario,
-            NEW.id_tarea
-        );
+
+        v_mensaje := 'La tarea "' || NEW.titulo || '" vence el ' ||
+                     TO_CHAR(NEW.fecha_vencimiento, 'DD-MM-YYYY');
+
+        -- Sin este NOT EXISTS, cada edicion de la fecha de vencimiento
+        -- insertaba OTRO aviso identico: editar dos veces la misma tarea
+        -- dejaba tres notificaciones repetidas en la campana. Si la fecha
+        -- cambia, el mensaje cambia y si corresponde se genera un aviso nuevo.
+        IF NOT EXISTS (SELECT 1 FROM notificacion n
+                       WHERE n.id_tarea = NEW.id_tarea
+                         AND n.mensaje  = v_mensaje) THEN
+            INSERT INTO notificacion (mensaje, id_usuario, id_tarea)
+            VALUES (v_mensaje, NEW.id_usuario, NEW.id_tarea);
+        END IF;
     END IF;
     RETURN NEW;
 END;

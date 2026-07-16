@@ -1,10 +1,17 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import api from '../api'
+import { sesion } from '../auth'
 
 /**
- * Estadisticas espaciales calculadas con PostGIS. Todas son PRIVADAS:
- * la API resuelve cada respuesta con el id del usuario autenticado.
+ * Estadisticas espaciales calculadas con PostGIS.
+ * Todas las metricas personales son PRIVADAS: la API las resuelve con el
+ * id del usuario autenticado. El reporte "por usuario y sector" (P6 del
+ * enunciado) es un agregado global que expone solo conteos.
+ *
+ * Se usa Promise.allSettled (y no Promise.all) a proposito: si un endpoint
+ * falla, el resto de la pagina igual se muestra en vez de quedarse colgada
+ * en el estado "cargando".
  */
 const porSector = ref([])
 const masCercana = ref(null)
@@ -12,13 +19,29 @@ const sectorTop = ref(null)
 const radioKm = ref(2)
 const promedio = ref(null)
 const clusters = ref([])
+const porUsuario = ref([])
+const soloMias = ref(false)
 const cargando = ref(true)
+const error = ref('')
+
+// El filtro "solo las mías" es del lado del cliente a proposito: el reporte ya
+// viene agregado y es liviano. No hay dato nuevo que pedirle al servidor.
+const porUsuarioFiltrado = computed(() => {
+  if (!soloMias.value) return porUsuario.value
+  const yo = sesion.usuario?.nombreUsuario
+  return porUsuario.value.filter((f) => f.usuario === yo)
+})
 
 async function cargarSectorTop() {
-  const { data } = await api.get('/estadisticas/sector-mas-completadas', {
-    params: { radioKm: radioKm.value },
-  })
-  sectorTop.value = data[0] || null
+  try {
+    const { data } = await api.get('/estadisticas/sector-mas-completadas', {
+      params: { radioKm: radioKm.value },
+    })
+    sectorTop.value = data[0] || null
+  } catch (e) {
+    sectorTop.value = null
+    error.value = 'No se pudo calcular la zona con más completadas.'
+  }
 }
 
 function cambiarRadio(km) {
@@ -32,16 +55,25 @@ function metros(v) {
 }
 
 onMounted(async () => {
-  const [ps, mc, pd, cl] = await Promise.all([
-    api.get('/estadisticas/tareas-por-sector'),
-    api.get('/estadisticas/tarea-mas-cercana'),
-    api.get('/estadisticas/promedio-distancia'),
-    api.get('/estadisticas/clusters-pendientes'),
-  ])
-  porSector.value = ps.data
-  masCercana.value = mc.data[0] || null
-  promedio.value = pd.data[0] ? pd.data[0].promedio_distancia_metros : null
-  clusters.value = cl.data
+  const rutas = [
+    '/estadisticas/tareas-por-sector',
+    '/estadisticas/tarea-mas-cercana',
+    '/estadisticas/promedio-distancia',
+    '/estadisticas/clusters-pendientes',
+    '/estadisticas/tareas-por-usuario-sector',
+  ]
+  const res = await Promise.allSettled(rutas.map((r) => api.get(r)))
+  const dato = (i) => (res[i].status === 'fulfilled' ? res[i].value.data : null)
+
+  porSector.value = dato(0) || []
+  masCercana.value = dato(1)?.[0] || null
+  promedio.value = dato(2)?.[0]?.promedio_distancia_metros ?? null
+  clusters.value = dato(3) || []
+  porUsuario.value = dato(4) || []
+
+  if (res.some((r) => r.status === 'rejected')) {
+    error.value = 'Algunas estadísticas no se pudieron calcular.'
+  }
   await cargarSectorTop()
   cargando.value = false
 })
@@ -59,6 +91,8 @@ onMounted(async () => {
     <p v-if="cargando" class="vacio">Calculando estadísticas espaciales…</p>
 
     <template v-else>
+      <p v-if="error" class="vacio">{{ error }}</p>
+
       <div class="stats-grilla">
         <div class="stat-carta">
           <p class="stat-etiqueta">Tu tarea pendiente más cercana</p>
@@ -118,8 +152,8 @@ onMounted(async () => {
         <div class="panel">
           <h2>Dónde se concentran tus pendientes</h2>
           <p class="ayuda">
-            Agrupación espacial de tus tareas pendientes. Puedes verlas dibujadas
-            en la pestaña Mapa.
+            Agrupación espacial (ST_ClusterKMeans) de tus tareas pendientes.
+            Puedes verlas dibujadas en la pestaña Mapa.
           </p>
           <table v-if="clusters.length">
             <thead>
@@ -135,6 +169,45 @@ onMounted(async () => {
           </table>
           <p v-else class="vacio">No tienes tareas pendientes que agrupar.</p>
         </div>
+      </div>
+
+      <div class="panel">
+        <h2>Reporte: tareas realizadas por cada usuario y sector</h2>
+        <p class="ayuda">
+          Único reporte global del sistema (pregunta 6 del enunciado). Muestra
+          solo conteos agregados: no expone el contenido de tareas ajenas.
+        </p>
+        <div class="stat-radios">
+          <button
+            class="filtro-boton"
+            :class="{ activo: !soloMias }"
+            @click="soloMias = false"
+          >
+            Todos los usuarios
+          </button>
+          <button
+            class="filtro-boton"
+            :class="{ activo: soloMias }"
+            @click="soloMias = true"
+          >
+            Solo las mías
+          </button>
+        </div>
+        <table v-if="porUsuarioFiltrado.length">
+          <thead>
+            <tr><th>Usuario</th><th>Sector (zona de operaciones)</th><th>Completadas</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(f, i) in porUsuarioFiltrado" :key="i">
+              <td>{{ f.usuario }}</td>
+              <td>{{ f.sector }}</td>
+              <td>{{ f.tareas_completadas }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="vacio">
+          {{ soloMias ? 'Aún no completas tareas.' : 'Todavía no hay tareas completadas en el sistema.' }}
+        </p>
       </div>
     </template>
   </section>

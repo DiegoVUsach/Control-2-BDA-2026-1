@@ -1,10 +1,5 @@
 ### ============================================================
-### BATERIA DE PRUEBAS DE LA API - Control 2 TBD
-### Uso: guardar como pruebas.http dentro del proyecto en IntelliJ
-### y ejecutar cada bloque con el boton verde que aparece al lado.
-### Requisitos: BD de Docker arriba + backend corriendo (:8080).
-### El login guarda el token automaticamente en {{token}}.
-### ============================================================
+
 
 ### 1. REGISTRO de un usuario nuevo (fase 2.3) -> 201
 POST http://localhost:8080/api/auth/register
